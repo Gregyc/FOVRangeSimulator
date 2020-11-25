@@ -13,11 +13,10 @@ from edge import Edge
 ## Constants ##
 
 MAX_NUM_INF = 1e9
-WINDOW_BIAS = 200
-ROOM_LINE_BIAS = 50 
-ROOM_PTS_BIAS = 50
-ROOM_WIDTH_BIAS = 30
-ROOM_HEIGHT_BIAS = 30
+WINDOW_BIAS_PERCENTAGE = 30
+ROOM_LINE_BIAS_PERCENTAGE = 20
+POLY_LINE_BIAS_PERCENTAGE = 30 
+
 
 # HFOV claim 120 but test 90
 # VHOV measured as 52
@@ -104,7 +103,7 @@ def window_init(window_name):
     # set default value
     cv2.setTrackbarPos('CamFacVDeg', window_name, 45)
     cv2.setTrackbarPos('CamFacHDeg', window_name, 90)    
-    cv2.setTrackbarPos('CamLoc_H', window_name, 200)
+    cv2.setTrackbarPos('CamLoc_H', window_name, 250)
     cv2.setTrackbarPos('CamLoc_W', window_name, int(room_width*100/2))
     cv2.setTrackbarPos('Person_H', window_name, 180)
 
@@ -387,13 +386,14 @@ def _point_in_polygon(point,polygon):
         poly2_x = polygon[i-1][0]
         poly2_y = polygon[i-1][1]
         result = ( point_y - poly1_y ) * (poly2_x - poly1_x) - (point_x - poly1_x) * (poly2_y - poly1_y)
-        if result >0:
+        
+        if result >0: # point lies on left of the polygon
             pos_cnt +=1
-        elif result <0:
+        elif result <0: # point lies on right of the polygon 
             neg_cnt +=1
         else:
             pass        
-
+    # all in same direction indicates point out of the polygon
     if (pos_cnt == num_poly) or (neg_cnt == num_poly):
         return True
     else:
@@ -407,11 +407,11 @@ class TkApp:
 
         self.canvas1 = tk.Canvas(master, width = 600, height = 400)
         self.canvas1.pack()
-        self.label1 = tk.Label(master, text='Input Room Width (0.0 - 100.0) m ')
+        self.label1 = tk.Label(master, text='Input Room Width (0.0 - 30.0) m ')
         self.canvas1.create_window(200, 25, window=self.label1)
         self.entry1 = tk.Entry (master) 
         self.canvas1.create_window(400, 25, window=self.entry1)
-        self.label2 = tk.Label(master, text='Input Room Height (0.0 - 100.0) m ')
+        self.label2 = tk.Label(master, text='Input Room Height (0.0 - 30.0) m ')
         self.canvas1.create_window(200, 50, window=self.label2)
         self.entry2 = tk.Entry (master) 
         self.canvas1.create_window(400, 50, window=self.entry2)
@@ -437,24 +437,24 @@ class TkApp:
         room_height_valid = False
 
         try: 
-            if (float(room_width)<=100.0) & ((float(room_width)>=0.0)):
+            if (float(room_width)<=30.0) & ((float(room_width)>=0.0)):
                 room_width_str = 'The room_width is '+room_width
                 room_width_valid = True
                 room_width = float(room_width)
             else:
-                room_width_str = 'Error range for room_width! please key the value in 0.0-100.0'
+                room_width_str = 'Error range for room_width! please key the value in 0.0-30.0'
         except ValueError:
                 room_width_str = 'Please input float number for room_width!! , type it again'
 
         self.label3.configure(text=room_width_str)
 
         try: 
-            if (float(room_height)<=100.0) & ((float(room_height)>=0.0)):
+            if (float(room_height)<=30.0) & ((float(room_height)>=0.0)):
                 room_height_str  ='The room_height is ' +room_height
                 room_height_valid = True
                 room_height = float(room_height)
             else:
-                room_height_str = 'Error range for room_height! please key the value in 0.0-100.0'
+                room_height_str = 'Error range for room_height! please key the value in 0.0-30.0'
         except ValueError:
                 room_height_str = 'Please input float number for room_height!! , type it again'
 
@@ -570,7 +570,7 @@ if __name__ == '__main__':
         try:
             deg = degrees(atan((right_top_y*(1)-cam_y_pos*(1))/(right_top_x - cam_x_pos)))
         except:
-            pass    
+            print('degree error')        
         rotate_deg = ( (deg-rotate_deg_user) *pi /180)
         distance = sqrt((right_top_y -cam_y_pos)**2 + (right_top_x - cam_x_pos )**2) 
 
@@ -581,7 +581,7 @@ if __name__ == '__main__':
         try:
             deg = degrees(atan((left_bottom_y*(1)-cam_y_pos*(1))/(left_bottom_x - cam_x_pos)))
         except:
-            pass    
+            print('degree error')    
         rotate_deg = ( (deg-rotate_deg_user) *pi /180)
         distance = sqrt((left_bottom_y -cam_y_pos)**2 + (left_bottom_x - cam_x_pos )**2) 
         rotate_left_bottom_x = cam_x_pos - (distance) * cos(rotate_deg)
@@ -592,7 +592,7 @@ if __name__ == '__main__':
         try:
             deg = degrees(atan((left_top_y*(1)-cam_y_pos*(1))/(left_top_x - cam_x_pos)))
         except:
-            pass    
+            print('degree error')     
         rotate_deg = ( (deg-rotate_deg_user) *pi /180)
         distance = sqrt((left_top_y -cam_y_pos)**2 + (left_top_x - cam_x_pos )**2) 
         rotate_left_top_x = cam_x_pos - (distance) * cos(rotate_deg)
@@ -615,8 +615,15 @@ if __name__ == '__main__':
 
 
         # plot for visible range
-        window_height = int(room_height*100+WINDOW_BIAS)
-        window_width = int(room_width*100+WINDOW_BIAS)
+        window_height_bias = room_height * 100 * WINDOW_BIAS_PERCENTAGE / 100
+        window_width_bias = room_width * 100 * WINDOW_BIAS_PERCENTAGE /100
+        window_bias = max(window_height_bias,window_width_bias)
+        room_line_bias = window_bias * ROOM_LINE_BIAS_PERCENTAGE /100
+        poly_line_bias = window_bias * POLY_LINE_BIAS_PERCENTAGE /100 
+
+        
+        window_height = int(room_height*100+window_bias)
+        window_width = int(room_width*100+window_bias)
 
         new_img = np.zeros((window_height,window_width,3),np.uint8)
         room_height_cm_int = int(room_height*100)
@@ -625,29 +632,50 @@ if __name__ == '__main__':
 
         # map the min, max distance to x,y axis
         room_list_arr = np.array([ [0,0],[0,room_height],[room_width,room_height],[room_width,0] ],dtype=float)
-        room_pts = room_list_arr*100 + ROOM_LINE_BIAS
+        room_pts = room_list_arr*100 + room_line_bias
         room_pts = room_pts.astype(np.int32)
         # map coordinate to (頂點數量, 1, 2) array
         room_pts = room_pts.reshape((-1, 1, 2))
 
-        cv2.namedWindow('ROOM',cv2.WINDOW_NORMAL)
+        cv2.namedWindow('ROOM', cv2.WINDOW_KEEPRATIO | cv2.WINDOW_AUTOSIZE)
         # # plot the visible range
         rot_point_arr = np.array(rotate_final_list)
-        rot_point_pts = rot_point_arr*100 + ROOM_LINE_BIAS
+        rot_point_pts = rot_point_arr*100 + room_line_bias
         rot_point_pts = rot_point_pts.astype(np.int32)
         rot_point_pts = rot_point_pts.reshape((-1,1,2))
         cv2.polylines(new_img, [rot_point_pts], True, (255, 50, 255), 4)
         cv2.fillPoly(new_img, [rot_point_pts], (255,50,255)) 
 
+
+        # get scale of font size
+
+        ratio = 600 / max(window_height,window_width)
+        resize_window_width = round(window_width * ratio)
+        resize_window_height = round(window_height * ratio)
+        fontScale = 1/ratio
+
+        if max(window_height,window_width) < 512:
+            font_thickness = 1
+        elif max(window_height,window_width) < 1024:
+            font_thickness = 2
+        elif max(window_height,window_width) < 2048:
+            font_thickness = 4    
+        else:
+            font_thickness = 8    
+
         # print rotation coordinate
         for i in range(len(rot_point_arr)):
-            cv2.putText(new_img, f'({rot_point_arr[i][0]:.1f},{rot_point_arr[i][1]:.1f} ) ', tuple(rot_point_pts[i][0]), cv2.FONT_HERSHEY_SIMPLEX, 1,  (0,0,255), 2, cv2.LINE_AA)
+            cv2.putText(new_img, f'({rot_point_arr[i][0]:.1f},{rot_point_arr[i][1]:.1f}) ', tuple(rot_point_pts[i][0]), cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale,  (0,0,255), font_thickness, cv2.LINE_AA)
 
         # print room coordinate
         for i in range(len(room_list_arr)):
-            cv2.putText(new_img, f'({room_list_arr[i][0]:.1f},{room_list_arr[i][1]:.1f} ) ', tuple(room_pts[i][0]), cv2.FONT_HERSHEY_SIMPLEX, 1,  (0,0,255), 2, cv2.LINE_AA)
+            cv2.putText(new_img, f'({room_list_arr[i][0]:.1f},{room_list_arr[i][1]:.1f}) ', tuple(room_pts[i][0]), cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale,  (0,0,255), font_thickness, cv2.LINE_AA)
 
         cv2.polylines(new_img, [room_pts], True, (255, 255, 255), 4)
+
+
+        new_img = cv2.resize(new_img, (resize_window_width,resize_window_height),interpolation=cv2.INTER_CUBIC)
+
         cv2.imshow('ROOM', new_img)
         if cv2.waitKey(1) == ord('q'):
             break        

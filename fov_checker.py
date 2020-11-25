@@ -66,9 +66,16 @@ def cal_v_min_distance(height,facedeg,v_fov):
     return  round(min_d/100,1)
 
 
-def cal_h_distance(distance,h_fov):
+# def cal_h_distance(distance,h_fov):
+#     hor_distance = 2* distance * tan(h_fov*pi/180)
+#     return round(hor_distance,1)
+
+def cal_h_distance(v_distance,h_fov,cam_height_cm):
+    cam_height_m = cam_height_cm/100
+    distance = sqrt((v_distance**2 + cam_height_m**2))
     hor_distance = 2* distance * tan(h_fov*pi/180)
     return round(hor_distance,1)
+
 
 
 
@@ -166,22 +173,23 @@ def cal_theorical_min_max_distance(face_vdeg,height,half_vfov,half_hfov):
         min_v_distance = cal_v_min_distance(height,face_vdeg,half_vfov) 
 
         max_h_distance = 'Inf'
-        min_h_distance = cal_h_distance(min_v_distance,half_hfov)
+        min_h_distance = cal_h_distance(min_v_distance,half_hfov,height)
 
     # min can't measure condition
     elif face_vdeg+ half_vfov > 90 :
         max_v_distance = cal_v_max_distance(height,face_vdeg,half_vfov)  
         min_v_distance = 0
 
-        max_h_distance = cal_h_distance(max_v_distance,half_hfov)
-        min_h_distance = 0
+        max_h_distance = cal_h_distance(max_v_distance,half_hfov,height)
+        # min_h_distance = 0
+        min_h_distance = cal_h_distance(min_v_distance,half_hfov,height)
 
     # normal condition (camera basically face down )
     else:
         max_v_distance = cal_v_max_distance(height,face_vdeg,half_vfov)
         min_v_distance = cal_v_min_distance(height,face_vdeg,half_vfov)
-        max_h_distance = cal_h_distance(max_v_distance,half_hfov)
-        min_h_distance = cal_h_distance(min_v_distance,half_hfov)
+        max_h_distance = cal_h_distance(max_v_distance,half_hfov,height)
+        min_h_distance = cal_h_distance(min_v_distance,half_hfov,height)
     return min_v_distance, max_v_distance, min_h_distance, max_h_distance   
 
 
@@ -215,14 +223,14 @@ def cal_min_max_distance_with_human_height(p_height, height,min_v_distance, max_
     # camera higher than person, only change max distance 
     if p_height < height:
         min_v_distance_person = min_v_distance
-        min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov)
+        min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov,height)
 
         if face_vdeg <= half_vfov:
             max_v_distance_person = 'Inf'
             max_h_distance_person = 'Inf'
         else:    
             max_v_distance_person = round(max_v_distance - ((max_v_distance/height)*p_height),1)
-            max_h_distance_person = cal_h_distance(max_v_distance_person,half_hfov)
+            max_h_distance_person = cal_h_distance(max_v_distance_person,half_hfov,height)
 
         # check if max is larger than min distance
         if (type(max_v_distance_person ) ==float) & (type(min_v_distance_person) == float):
@@ -237,7 +245,7 @@ def cal_min_max_distance_with_human_height(p_height, height,min_v_distance, max_
             max_h_distance_person = 'Inf'
 
             min_v_distance_person = min_v_distance
-            min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov)
+            min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov,height)
 
 
         else:
@@ -249,7 +257,7 @@ def cal_min_max_distance_with_human_height(p_height, height,min_v_distance, max_
     else:
         if face_vdeg < half_vfov:
             min_v_distance_person = round((p_height-height)/tan((half_vfov-face_vdeg)*pi/180),1)
-            min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov)
+            min_h_distance_person = cal_h_distance(min_v_distance_person,half_hfov,height)
 
             max_v_distance_person = 'Inf'
             max_h_distance_person = 'Inf'
@@ -641,6 +649,13 @@ if __name__ == '__main__':
 
         rotate_final_list = get_visible_range_points_in_room (rotate_polygon,room_polygon,rotate_polygon_intersection)
 
+
+
+        # plot for the whole image
+
+
+
+
         # Greg Test Done        
 
 
@@ -761,11 +776,11 @@ if __name__ == '__main__':
 
 
         # map the min, max distance to x,y axis
-        room_pts = np.array([[0+ROOM_LINE_BIAS, 0+ROOM_LINE_BIAS], [room_width_cm_int+ROOM_LINE_BIAS,0+ROOM_LINE_BIAS ], [room_width_cm_int+ROOM_LINE_BIAS, room_height_cm_int+ROOM_LINE_BIAS], [0+ROOM_LINE_BIAS, room_height_cm_int+ROOM_LINE_BIAS]], np.int32)
-
+        room_list_arr = np.array([ [0,0],[0,room_height],[room_width,room_height],[room_width,0] ],dtype=float)
+        room_pts = room_list_arr*100 + ROOM_LINE_BIAS
+        room_pts = room_pts.astype(np.int32)
         # map coordinate to (頂點數量, 1, 2) array
         room_pts = room_pts.reshape((-1, 1, 2))
-
 
         # get each point of visible range ( 4 - 6 points)
         left_bottom_pts = [int(left_bottom_x*100+ROOM_LINE_BIAS),int(left_bottom_y*100+ROOM_LINE_BIAS)]
@@ -801,12 +816,23 @@ if __name__ == '__main__':
         cv2.polylines(new_img, [rot_point_pts], True, (255, 50, 255), 4)
         cv2.fillPoly(new_img, [rot_point_pts], (255,50,255)) 
 
+        # print rotation coordinate
+        for i in range(len(rot_point_arr)):
+            cv2.putText(new_img, f'({rot_point_arr[i][0]:.1f},{rot_point_arr[i][1]:.1f} ) ', tuple(rot_point_pts[i][0]), cv2.FONT_HERSHEY_SIMPLEX, 1,  (255,0,255), 2, cv2.LINE_AA)
+
+        # print room coordinate
+        for i in range(len(room_list_arr)):
+            cv2.putText(new_img, f'({room_list_arr[i][0]:.1f},{room_list_arr[i][1]:.1f} ) ', tuple(room_pts[i][0]), cv2.FONT_HERSHEY_SIMPLEX, 1,  (255,0,255), 2, cv2.LINE_AA)
+
+
+
         # Greg Test Done
+
 
         # # plot the visible range
         cv2.polylines(new_img, [room_pts], True, (255, 255, 255), 4)
         cv2.polylines(new_img, [vis_point_pts], True, (255, 255, 255), 4)
-        cv2.fillPoly(new_img, [vis_point_pts], (255,255,255))
+        # cv2.fillPoly(new_img, [vis_point_pts], (255,255,255))
 
         cv2.putText(new_img, f'({left_bottom_x:.1f},{left_bottom_y:.1f} ) ', tuple(left_bottom_pts), cv2.FONT_HERSHEY_SIMPLEX, 1,  (255,0,255), 2, cv2.LINE_AA)
         cv2.putText(new_img, f'({left_top_x:.1f},{left_top_y:.1f} ) ', tuple(left_top_pts), cv2.FONT_HERSHEY_SIMPLEX, 1,  (255,0,255), 2, cv2.LINE_AA)

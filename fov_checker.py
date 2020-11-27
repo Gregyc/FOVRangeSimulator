@@ -639,12 +639,13 @@ if __name__ == '__main__':
 
         cv2.namedWindow('ROOM', cv2.WINDOW_KEEPRATIO | cv2.WINDOW_AUTOSIZE)
         # # plot the visible range
-        rot_point_arr = np.array(rotate_final_list)
-        rot_point_pts = rot_point_arr*100 + room_line_bias
-        rot_point_pts = rot_point_pts.astype(np.int32)
-        rot_point_pts = rot_point_pts.reshape((-1,1,2))
-        cv2.polylines(new_img, [rot_point_pts], True, (255, 50, 255), 4)
-        cv2.fillPoly(new_img, [rot_point_pts], (255,50,255)) 
+        if rotate_final_list:
+            rot_point_arr = np.array(rotate_final_list)
+            rot_point_pts = rot_point_arr*100 + room_line_bias
+            rot_point_pts = rot_point_pts.astype(np.int32)
+            rot_point_pts = rot_point_pts.reshape((-1,1,2))
+            cv2.polylines(new_img, [rot_point_pts], True, (255, 50, 255), 4)
+            cv2.fillPoly(new_img, [rot_point_pts], (255,50,255)) 
 
 
         # get scale of font size
@@ -664,8 +665,9 @@ if __name__ == '__main__':
             font_thickness = 8    
 
         # print rotation coordinate
-        for i in range(len(rot_point_arr)):
-            cv2.putText(new_img, f'({rot_point_arr[i][0]:.1f},{rot_point_arr[i][1]:.1f}) ', tuple(rot_point_pts[i][0]), cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale,  (0,0,255), font_thickness, cv2.LINE_AA)
+        if rotate_final_list:
+            for i in range(len(rot_point_arr)):
+                cv2.putText(new_img, f'({rot_point_arr[i][0]:.1f},{rot_point_arr[i][1]:.1f}) ', tuple(rot_point_pts[i][0]), cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale,  (0,0,255), font_thickness, cv2.LINE_AA)
 
         # print room coordinate
         for i in range(len(room_list_arr)):
